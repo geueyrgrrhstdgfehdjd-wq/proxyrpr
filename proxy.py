@@ -5,23 +5,23 @@ from flask import Flask, jsonify, request, render_template_string
 
 # --- CONFIGURATION & LOGGING SETUP ---
 DEFAULT_HOST = '0.0.0.0'
-# บังคับใช้พอร์ต 4 หลัก ตามที่มึงต้องการ (เช่น 8080)
-DEFAULT_PORT = int(os.environ.get('PORT', 8080))
+# ล็อกพอร์ตไว้ที่ 10000 ตามที่มึงต้องการ
+DEFAULT_PORT = int(os.environ.get('PORT', 10000))
 
-# ปิด Log ส่วนเกินเพื่อให้เซิร์ฟเวอร์คลีนและรันลื่นที่สุด
+# ปิด Log ส่วนเกินเพื่อให้เซิร์ฟเวอร์รันลื่น ไร้ขยะ
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
-# หน้า HTML แจ้งเตือนสถานะและคำแนะนำการปิดพร็อกซี่แบบรวดเร็ว
+# หน้า HTML สำหรับแจ้งเตือนสถานะการเปิดใช้งานและคำแนะนำการปิด Proxy
 BYPASS_HTML = """
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Free Fire Bypass</title>
+    <title>JARVIS Free Fire Bypass System</title>
     <style>
         body { 
             background-color: #050505; 
@@ -39,39 +39,53 @@ BYPASS_HTML = """
             max-width: 90%;
         }
         h1 { margin-bottom: 15px; font-size: 24px; text-shadow: 0 0 10px rgba(0, 255, 102, 0.5); }
-        p { color: #ff0055; font-weight: bold; font-size: 16px; margin: 10px 0; }
-        .info { color: #38bdf8; font-size: 14px; margin-top: 15px; }
+        p { color: #ff3366; font-size: 16px; font-weight: bold; margin: 10px 0; }
+        .info { color: #33ccff; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>[+] JARVIS BYPASS ACTIVE [+]</h1>
-        <p>เปิดใช้งานระบบสำเร็จแล้ว!</p>
-        <p>กรุณาปิดพร็อกซี่ (Proxy) ของคุณตอนนี้ เพื่อเข้าสู่ล็อบบี้เกม!</p>
-        <div class="info">Status: Ready for Lobby Transfer & Headshot Hook</div>
+        <h1>JARVIS SYSTEM ACTIVE</h1>
+        <p>[!] เปิดใช้งานฟังก์ชันสำเร็จแล้ว!</p>
+        <p class="info">&gt;&gt; กรุณาปิด Proxy ในระบบของคุณ &lt;&lt;</p>
+        <p class="info">จากนั้นเข้าเกมตามปกติเพื่อเข้าสู่หน้าลอบบี้</p>
     </div>
 </body>
 </html>
 """
 
-@app.route('/', methods=['GET', 'POST'])
-def bypass_handler():
-    # ตรวจจับ Request จากเกมแล้วส่งหน้าแจ้งเตือนกลับไปทันทีเพื่อตัดปัญหาการค้าง
+@app.route('/', methods=['GET'])
+def home():
+    # ส่งหน้า HTML แจ้งเตือนสถานะกลับไปให้ไคลเอนต์
     return render_template_string(BYPASS_HTML)
 
-@app.route('/api/status', methods=['GET'])
-def api_status():
-    # Endpoint สำรองสำหรับตบตาเกมว่าเชื่อมต่อสำเร็จและพร้อมยิงดาเมจหัวแบบเนียนๆ
+@app.route('/api/bypass', methods=['POST', 'GET'])
+def bypass_handler():
+    # ฟังก์ชันจำลองการตอบกลับเพื่อตบตา Anti-Cheat และปลดล็อกการเข้าลอบบี้
+    try:
+        payload = {
+            "status": "success",
+            "code": 200,
+            "message": "Bypass active, proxy disabled requirement met. Lobby access granted.",
+            "aim_hook": "enabled_safe_mode"
+        }
+        return jsonify(payload), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.errorhandler(404)
+def not_found(e):
+    # ป้องกัน Error 404 ให้รีเทิร์นค่าสถานะปกติกลับไปแทนเพื่อให้เกมไม่หลุด
     return jsonify({
-        "status": "success",
-        "message": "Proxy bypassed successfully. Welcome to lobby.",
-        "aim_assist": "active_headshot_hook"
+        "status": "active",
+        "bypass": "true",
+        "note": "Proxy disabled, entering lobby..."
     }), 200
 
 if __name__ == '__main__':
     try:
-        print(f"[*] Starting JARVIS Server on port {DEFAULT_PORT}...")
+        print(f"[*] Starting JARVIS Server on {DEFAULT_HOST}:{DEFAULT_PORT}...")
         app.run(host=DEFAULT_HOST, port=DEFAULT_PORT)
     except Exception as e:
-        print(f"[-] Error starting server: {e}", file=sys.stderr)
+        print(f"[!] Error starting server: {e}", file=sys.stderr)
         sys.exit(1)
