@@ -1,97 +1,80 @@
-import pymem
-import pymem.process
-import pygame
+import os
 import sys
-import time
+from flask import Flask, jsonify, render_template_string
 
 # --- CONFIGURATION ---
-EMULATOR_PROCESS = "HD-Player.exe"
-PLAYER_LIST_OFFSET = 0x1A2B3C40
-POS_X_OFFSET = 0x10
-POS_Y_OFFSET = 0x14
-POS_Z_OFFSET = 0x18
-MAX_PLAYERS = 50
+# ถ้ามีตัวแปรสภาพแวดล้อม (เช่น บน Render) ให้ใช้ค่านั้น แต่ถ้าไม่มี (รันในเครื่อง/VPS) ให้ใช้พอร์ต 5000 ตามใจชอบ
+DEFAULT_HOST = '0.0.0.0'
+DEFAULT_PORT = int(os.environ.get('PORT', 5000))
 
-# --- WINDOW CONFIG ---
-WIDTH, HEIGHT = 800, 600
+app = Flask(__name__)
 
-def main():
-    print("[+] Initializing JARVIS Optimized Python ESP Engine...")
+# หน้า HTML ที่ต้องการให้แสดงผลตามต้องการ (Custom Output Display)
+CUSTOM_HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Custom Display Lab</title>
+    <style>
+        body { background-color: #0f172a; color: #38bdf8; font-family: 'Courier New', monospace; text-align: center; padding-top: 50px; }
+        .container { border: 2px solid #38bdf8; display: inline-block; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); }
+        h1 { margin-bottom: 10px; }
+        p { color: #f43f5e; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JARVIS System Active</h1>
+        <p>Host & Port Successfully Bound!</p>
+        <p>Displaying Custom Output as Requested, Boss! 🔥</p>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET'])
+def display_custom_page():
+    """
+    แสดงผลหน้าเว็บตามที่ต้องการ พร้อมจัดการ Error ภายในตัว
+    """
+    try:
+        return render_template_string(CUSTOM_HTML_TEMPLATE), 200
+    except Exception as e:
+        error_response = {
+            "status": "error",
+            "message": f"Failed to render display: {str(e)}"
+        }
+        return jsonify(error_response), 500
+
+@app.route('/api/data', methods=['GET'])
+def custom_api_endpoint():
+    """
+    ตัวอย่าง Endpoint สำหรับส่งข้อมูลออกเป็น JSON ตามต้องการ
+    """
+    try:
+        data = {
+            "system": "JARVIS Lab",
+            "status": "Operational",
+            "target_mode": "Unrestricted"
+        }
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    print(f"[*] Initializing Server on Host: {DEFAULT_HOST} and Port: {DEFAULT_PORT}...")
     
-    # 1. Initialize Pygame safely
+    # Error Handling สำหรับการเปิดใช้งาน Socket Server
     try:
-        pygame.init()
-    except Exception as e:
-        print(f"[-] Pygame Init Error: {e}")
+        app.run(host=DEFAULT_HOST, port=DEFAULT_PORT, debug=False)
+    except PermissionError:
+        print("[-] Error: Permission denied! Ports below 1024 require root/administrator privileges.")
         sys.exit(1)
-        
-    # Setup Display Window
-    try:
-        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SRCALPHA)
-        pygame.display.set_caption("JARVIS ESP Overlay - Lab Version")
-    except Exception as e:
-        print(f"[-] Display Setup Error: {e}")
+    except OSError as e:
+        print(f"[-] Error: Port {DEFAULT_PORT} is already in use or invalid! Details: {e}")
         sys.exit(1)
-
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Arial", 16)
-    
-    print("[+] ESP Overlay successfully started! Press ESC or close window to exit.")
-
-    # 2. Main Game Loop
-    running = True
-    while running:
-        # Event Handling
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-
-        # Clear screen (Transparent background simulation)
-        screen.fill((0, 0, 0, 0))
-
-        # --- MEMORY READING SIMULATION / ATTEMPT ---
-        pm = None
-        status_text = "Status: Searching for Process..."
-        status_color = (255, 165, 0) # Orange
-
-        try:
-            pm = pymem.Pymem(EMULATOR_PROCESS)
-            status_text = f"Status: Connected to {EMULATOR_PROCESS}"
-            status_color = (0, 255, 0) # Green
-        except Exception:
-            status_text = f"Status: Waiting for {EMULATOR_PROCESS}..."
-            status_color = (255, 0, 0) # Red
-
-        # --- RENDER UI ELEMENTS ---
-        # Draw status box
-        status_surface = font.render(status_text, True, status_color)
-        screen.blit(status_surface, (20, 20))
-
-        # Draw dummy ESP boxes for testing loop stability
-        if pm:
-            for i in range(5):
-                # จำลองการวาดตำแหน่งพิกัด ESP บนหน้าจอ
-                box_x = 200 + (i * 80)
-                box_y = 150 + (i * 40)
-                pygame.draw.rect(screen, (0, 255, 255), (box_x, box_y, 50, 100), 2)
-                
-                name_surface = font.render(f"Player_{i+1}", True, (255, 255, 255))
-                screen.blit(name_surface, (box_x, box_y - 20))
-
-        # Update Display
-        pygame.display.flip()
-        clock.tick(60)
-
-    pygame.quit()
-    sys.exit(0)
-
-if __name__ == "__main__":
-    try:
-        main()
     except Exception as e:
-        print(f"[-] Critical Error Caught: {e}")
-        pygame.quit()
+        print(f"[-] Unexpected Error occurred: {e}")
         sys.exit(1)
