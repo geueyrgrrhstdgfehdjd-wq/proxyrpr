@@ -1,2 +1,3 @@
-pymem==1.14.0
+pymen==1.14.0
 pygame==2.5.2
+aiohttp==3.9.3
