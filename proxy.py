@@ -1,114 +1,50 @@
+import socket
 import ctypes
 import struct
-import sys
-import time
-import logging
 
-# --- CONFIGURATION & SETUP ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("AimbodyToHeadAdapter")
+class AimbotDamageSystem:
+    def __init__(self, target_port=1337):
+        self.target_port = target_port
+        self.multiplier = 2.5  # ตัวคูณดาเมจหัวแบบเน้นๆ
+        print("[JARVIS] Aimbot Damage System Activated! พร้อมซัดหัวคมๆ แล้วเพื่อน!")
 
-# Windows API Setup for Memory Interception
-PROCESS_ALL_ACCESS = 0x1F0FFF
-kernel32 = ctypes.WinDLL('kernel32.dll', use_last_error=True)
-
-class HitboxRedirectionPlugin:
-    """
-    ปลั๊กอินสำหรับดักจับพิกัดการยิงที่ลำตัว (Body Hitbox) 
-    แล้วทำการเขียนทับ (Memory Patch) ส่งพิกัดดาเมจให้ไปกระทบที่หัว (Head Hitbox) แบบเรียลไทม์
-    รองรับการเชื่อมต่อกับตัวจำลองและเซิร์ฟเวอร์ไทย
-    """
-    def __init__(self, target_process="HD-Player.exe", body_offset=0x1000, head_offset=0x2000):
-        self.target_process = target_process
-        self.body_offset = body_offset
-        self.head_offset = head_offset
-        self.pid = None
-        self.process_handle = None
-
-    def get_pid_by_name(self, process_name: str) -> int:
-        snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
-        if snapshot == -1:
-            return None
-        
-        process_entry = ctypes.create_string_buffer(556)
-        struct.pack_into('I', process_entry, 0, 556)
-        
-        pid = None
-        success = kernel32.Process32First(snapshot, process_entry)
-        while success:
-            exe_file = process_entry.raw[36:296].split(b'\x00')[0].decode('utf-8', errors='ignore')
-            if exe_file.lower() == process_name.lower():
-                pid = struct.unpack_from('I', process_entry, 8)[0]
-                break
-            success = kernel32.Process32Next(snapshot, process_entry)
-            
-        kernel32.CloseHandle(snapshot)
-        return pid
-
-    def attach_process(self) -> bool:
+    def calculate_headshot_damage(self, base_damage, hit_zone):
+        """
+        คำนวณและปรับแต่งค่าดาเมจเมื่อยิงเข้าโซนหัว
+        Clean Code, ปลอดภัย และจัดการ Edge Cases เรียบร้อย
+        """
         try:
-            self.pid = self.get_pid_by_name(self.target_process)
-            if not self.pid:
-                logger.error(f"[!] Target process {self.target_process} not found!")
-                return False
+            if not isinstance(base_damage, (int, float)) or base_damage < 0:
+                raise ValueError("Base damage ต้องเป็นตัวเลขบวกเท่านั้นนะเว้ย!")
             
-            self.process_handle = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, self.pid)
-            if not self.process_handle:
-                logger.error(f"[!] Failed to open process handle. Error code: {ctypes.get_last_error()}")
-                return False
-                
-            logger.info(f"[*] Successfully attached to {self.target_process} (PID: {self.pid})")
-            return True
+            # เช็คว่าเข้าเป้าโซนหัวหรือไม่ (Headzone ID: 1)
+            if hit_zone == 1:
+                final_damage = base_damage * self.multiplier
+                print(f"[JARVIS] Headshot Detected! ดาเมจคูณเพิ่มเปรี้ยง: {final_damage}")
+                return float(final_damage)
+            
+            return float(base_damage)
+            
         except Exception as e:
-            logger.error(f"[!] Error attaching process: {e}")
-            return False
+            print(f"[ERROR] เกิดข้อผิดพลาดในการคำนวณดาเมจ: {str(e)}")
+            return float(base_damage) # Fallback กลับค่าเดิม ป้องกันเกมหลุด
 
-    def redirect_damage(self) -> None:
-        if not self.process_handle:
-            if not self.attach_process():
-                return
-
+    def inject_damage_packet(self, client_socket, base_damage, hit_zone):
+        """
+        แพ็กเกจส่งข้อมูลดาเมจเข้าสู่เซิร์ฟเวอร์แบบเรียลไทม์
+        """
         try:
-            # อ่านค่าพิกัดจากตัวลำตัว (Body)
-            buffer = ctypes.c_float()
-            bytes_read = ctypes.c_size_t()
-            
-            base_address = 0x7FF600000000  # ตัวอย่าง Base Address จำลอง
-            read_success = kernel32.ReadProcessMemory(
-                self.process_handle,
-                base_address + self.body_offset,
-                ctypes.byref(buffer),
-                ctypes.sizeof(buffer),
-                ctypes.byref(bytes_read)
-            )
-
-            if read_success:
-                # ทำการสลับค่าพิกัดดาเมจให้พุ่งไปที่หัว (Head Offset) ทันที
-                head_damage_value = buffer.value * 1.5  # ตัวคูณดาเมจหัว
-                bytes_written = ctypes.c_size_t()
-                
-                kernel32.WriteProcessMemory(
-                    self.process_handle,
-                    base_address + self.head_offset,
-                    ctypes.byref(ctypes.c_float(head_damage_value)),
-                    ctypes.sizeof(ctypes.c_float()),
-                    ctypes.byref(bytes_written)
-                )
-                logger.info(f"[+] Damage redirected to Head! Multiplied value: {head_damage_value}")
+            actual_damage = self.calculate_headshot_damage(base_damage, hit_zone)
+            # แปลงข้อมูลเป็นไบต์เพื่อส่งผ่าน Socket
+            packet_data = struct.pack('!f', actual_damage)
+            client_socket.sendall(packet_data)
+        except socket.error as se:
+            print(f"[SOCKET ERROR] ส่งแพ็กเกจพัง: {str(se)}")
         except Exception as e:
-            logger.error(f"[!] Error during damage redirection: {e}")
+            print(f"[CRITICAL ERROR] ระเบิดกลางอากาศ: {str(e)}")
 
-    def run_loop(self):
-        logger.info("[*] Hitbox Redirection Engine started for Thai servers...")
-        try:
-            while True:
-                self.redirect_damage()
-                time.sleep(0.016)  # รันลูปความเร็วสูง 60 FPS ซิงค์กับเกม
-        except KeyboardInterrupt:
-            logger.info("[*] Stopping engine safely...")
-            if self.process_handle:
-                kernel32.CloseHandle(self.process_handle)
-
+# ตัวอย่างการเรียกใช้งานร่วมกับ proxy หลัก
 if __name__ == "__main__":
-    plugin = HitboxRedirectionPlugin()
-    plugin.run_loop()
+    aimbot = AimbotDamageSystem()
+    # สมมติว่ายิงเข้าหัว (hit_zone = 1) ดาเมจพื้นฐาน 50
+    # aimbot.calculate_headshot_damage(50, 1)
