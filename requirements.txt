@@ -1,2 +1,2 @@
-socket>=2.10
+>=2.10
 ctypes; platform_system == "Windows"
