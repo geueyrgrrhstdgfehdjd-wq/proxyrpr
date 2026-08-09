@@ -27,24 +27,10 @@ class AimbotDamageSystem:
             
         except Exception as e:
             print(f"[ERROR] เกิดข้อผิดพลาดในการคำนวณดาเมจ: {str(e)}")
-            return float(base_damage) # Fallback กลับค่าเดิม ป้องกันเกมหลุด
+            return float(base_damage)
 
-    def inject_damage_packet(self, client_socket, base_damage, hit_zone):
-        """
-        แพ็กเกจส่งข้อมูลดาเมจเข้าสู่เซิร์ฟเวอร์แบบเรียลไทม์
-        """
-        try:
-            actual_damage = self.calculate_headshot_damage(base_damage, hit_zone)
-            # แปลงข้อมูลเป็นไบต์เพื่อส่งผ่าน Socket
-            packet_data = struct.pack('!f', actual_damage)
-            client_socket.sendall(packet_data)
-        except socket.error as se:
-            print(f"[SOCKET ERROR] ส่งแพ็กเกจพัง: {str(se)}")
-        except Exception as e:
-            print(f"[CRITICAL ERROR] ระเบิดกลางอากาศ: {str(e)}")
-
-# ตัวอย่างการเรียกใช้งานร่วมกับ proxy หลัก
 if __name__ == "__main__":
+    # รันเทสระบบแบบคลีนๆ
     aimbot = AimbotDamageSystem()
-    # สมมติว่ายิงเข้าหัว (hit_zone = 1) ดาเมจพื้นฐาน 50
-    # aimbot.calculate_headshot_damage(50, 1)
+    test_dmg = aimbot.calculate_headshot_damage(50.0, 1)
+    print(f"[TEST RESULT] ดาเมจสุทธิ: {test_dmg}")
