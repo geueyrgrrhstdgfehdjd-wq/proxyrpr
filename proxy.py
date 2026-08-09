@@ -1,12 +1,13 @@
 import socket
 import ctypes
 import struct
+import time
 
 class AimbotDamageSystem:
     def __init__(self, target_port=1337):
         self.target_port = target_port
         self.multiplier = 2.5  # ตัวคูณดาเมจหัวแบบเน้นๆ
-        print("[JARVIS] Aimbot Damage System Activated! พร้อมซัดหัวคมๆ แล้วเพื่อน!")
+        print(f"[JARVIS] Aimbot Damage System Activated! พร้อมซัดหัวคมๆ ที่พอร์ต {self.target_port} แล้วเพื่อน!")
 
     def calculate_headshot_damage(self, base_damage, hit_zone):
         """
@@ -29,8 +30,25 @@ class AimbotDamageSystem:
             print(f"[ERROR] เกิดข้อผิดพลาดในการคำนวณดาเมจ: {str(e)}")
             return float(base_damage)
 
+    def start_server_loop(self):
+        """
+        รันลูปหลักเพื่อให้โปรแกรมทำงานต่อเนื่อง ไม่ปิดตัวหนี
+        """
+        print("[JARVIS] Server Proxy Loop กำลังรันอยู่... กด Ctrl+C เพื่อหยุดการทำงาน")
+        try:
+            while True:
+                # จำลองการทำงานเบื้องหลัง ป้องกันแอปปิดตัวเร็วเกินไป
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n[JARVIS] ปิดการทำงานระบบเรียบร้อย แยกย้ายเพื่อนรัก!")
+
 if __name__ == "__main__":
-    # รันเทสระบบแบบคลีนๆ
-    aimbot = AimbotDamageSystem()
-    test_dmg = aimbot.calculate_headshot_damage(50.0, 1)
-    print(f"[TEST RESULT] ดาเมจสุทธิ: {test_dmg}")
+    # จุดเริ่มต้นการทำงานหลัก (Main Entry Point)
+    proxy_bot = AimbotDamageSystem(target_port=1337)
+    
+    # ทดสอบจำลองการคำนวณดาเมจหัว
+    test_damage = proxy_bot.calculate_headshot_damage(50.0, hit_zone=1)
+    print(f"[TEST RESULT] ค่าดาเมจสุทธิหลังคำนวณ: {test_damage}")
+    
+    # สั่งรันลูปเพื่อให้แอปไม่ปิดตัว (Application Exited Early Fix)
+    proxy_bot.start_server_loop()
